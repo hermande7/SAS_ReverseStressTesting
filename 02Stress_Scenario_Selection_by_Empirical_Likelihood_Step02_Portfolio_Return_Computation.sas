@@ -1,12 +1,15 @@
 /***************************************************************************************************/
 /*                                                                                                 */
-/* Stress Scenario Selection by Empirical Likelihood                                               */
+/* Stress Scenario  Selection by Empirical Likelihood                                              */
 /*                                                                                                 */
-/* STEP 3 - Define Loss Threshold                                                                  */
-/* ------------------------------                                                                  */
+/* STEP 2 - Portfolio Return Computation                                                           */
+/* -------------------------------------                                                           */
 /*                                                                                                 */
-/* input data:  - portfolio_ret dataset located in \data directory                                 */
-/* output data: - portfolio_ret dataset located in \data directory with loss indicator column      */
+/* input data:  - indices dataset located in the \data directory and computed in step 1.           */
+/* output data: - indices_ret     located in the \data directory and containing the weekly returns.*/
+/*              - portfolio_ret   located in the \data directory and containing the portfolio      */
+/*                                weekly returns.                                                  */
+/*                                                                                                 */
 /*                                                                                                 */
 /* SAS 9.4M1                                                                                       */
 /* Windows 64 Platform                                                                             */
@@ -16,18 +19,42 @@
 /***************************************************************************************************/
 
 
-/* The extreme loss threshold for the portfolio weekly return is set by the macro variable below:  */
-/* extreme_loss_threshold_weekly that was setup in step 1 earlier on.                              */
-/*                                                                                                 */
-/* In order to identify the historical losses above the loss threshold we setup a new              */
-/* column extreme_loss with: 0 when the portfolio return is >  extreme loss threshold              */
-/*                           1 when the portfolio return is <= extreme loss threshold              */
-data gdata.portfolio_ret;
- set gdata.portfolio_ret;
-  if portfolio_wreturn > -&extreme_loss_threshold_weekly then do;
-     extreme_loss = 0;
+/* Compute the indices weekly return */
+/* --------------------------------- */
+proc sort data=gdata.indices;
+   by Date;
+run;
+
+data gdata.indices_ret (keep= Date bovespa_wreturn dax_wreturn ftse_wreturn hs_wreturn sp_wreturn nikkei_wreturn);
+ set gdata.indices;
+  prev_bovespa = lag(bovespa);
+  prev_dax     = lag(dax);
+  prev_ftse    = lag(ftse);
+  prev_hs      = lag(hs);
+  prev_sp      = lag(sp);
+  prev_nikkei  = lag(nikkei);
+  
+  if _N_ ne 1 then do;
+	bovespa_wreturn = bovespa / prev_bovespa -1;
+	dax_wreturn = dax/ prev_dax -1;
+	ftse_wreturn = ftse/ prev_ftse -1;
+	hs_wreturn = hs/ prev_hs -1;
+	sp_wreturn = sp/ prev_sp -1;
+       nikkei_wreturn = nikkei / prev_nikkei -1;	
+       output;
   end;
-  else extreme_loss = 1;                                                          
+  else delete;	
+run;
+
+/* Compute the portfolio returns */
+data gdata.portfolio_ret;
+ set gdata.indices_ret;
+  portfolio_wreturn = 0.5050*sp_wreturn     +
+                      0.1363*ftse_wreturn   +
+                      0.0539*dax_wreturn    +
+                      0.1443*nikkei_wreturn +
+                      0.1022*hs_wreturn     +
+                      0.0583*bovespa_wreturn;
 run;
 
 
